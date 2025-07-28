@@ -244,42 +244,188 @@ delete_system() {
   fi
 }
 
+# ----------- App Management Functions -------
 
-# ----------------- 📋 Main Menu -----------------
+list_apps() {
+  echo "📦 Fetching list of applications..."
+  curl -s -X GET \
+    -H "x-api-key: $JC_API_KEY" \
+    https://console.jumpcloud.com/api/v2/applications | jq
+}
 
-main_menu() {
+get_app_details() {
+  read -p "🆔 Enter Application ID: " app_id
+  echo "🔍 Fetching application details..."
+  curl -s -X GET \
+    -H "x-api-key: $JC_API_KEY" \
+    https://console.jumpcloud.com/api/v2/applications/$app_id | jq
+}
+
+link_app_to_group() {
+  read -p "🆔 Enter Application ID: " app_id
+  read -p "👥 Enter Group ID to associate: " group_id
+  echo "🔗 Linking application to group..."
+  curl -s -X POST \
+    -H "x-api-key: $JC_API_KEY" \
+    -H "Content-Type: application/json" \
+    -d '{"op": "add", "type": "user_group", "id": "'$group_id'"}' \
+    https://console.jumpcloud.com/api/v2/applications/$app_id/associations | jq
+}
+
+unlink_app_from_group() {
+  read -p "🆔 Enter Application ID: " app_id
+  read -p "👥 Enter Group ID to remove: " group_id
+  echo "❌ Unlinking application from group..."
+  curl -s -X POST \
+    -H "x-api-key: $JC_API_KEY" \
+    -H "Content-Type: application/json" \
+    -d '{"op": "remove", "type": "user_group", "id": "'$group_id'"}' \
+    https://console.jumpcloud.com/api/v2/applications/$app_id/associations | jq
+}
+create_import_job() {
+  echo "📦 Create Import Job for Application"
+
+  read -p "🔢 Enter Application ID: " application_id
+  read -p "🎯 Query string (optional): " query_string
+  read -p "🔁 Allow user reactivation? (Y/n): " reactivation_choice
+
+  # Normalize reactivation input
+  allow_reactivation=true
+  if [[ "$reactivation_choice" =~ ^[Nn]$ ]]; then
+    allow_reactivation=false
+  fi
+
+  # Use default operations
+  operations='["users.create","users.update"]'
+
+  # Fetch org ID (you can cache this to avoid fetching again)
+  echo "🔍 Fetching organization ID..."
+  org_id=$(curl -s -H "x-api-key: $JC_API_KEY" \
+    https://console.jumpcloud.com/api/account | jq -r '.organization')
+
+  if [[ "$org_id" == "null" || -z "$org_id" ]]; then
+    echo "❌ Failed to fetch organization ID. Check your API key."
+    return 1
+  fi
+
+  echo "🚀 Sending import job request..."
+  response=$(curl -s -w "\n%{http_code}" -X POST "https://console.jumpcloud.com/api/v2/applications/$application_id/import/jobs" \
+    -H "Accept: application/json" \
+    -H "Content-Type: application/json" \
+    -H "x-api-key: $JC_API_KEY" \
+    -H "x-org-id: $org_id" \
+    -d "{
+      \"allowUserReactivation\": $allow_reactivation,
+      \"operations\": $operations,
+      \"queryString\": \"$query_string\"
+    }")
+
+  # Split response and HTTP code
+  body=$(echo "$response" | head -n -1)
+  http_code=$(echo "$response" | tail -n1)
+
+  if [[ "$http_code" == "200" ]]; then
+    echo "✅ Import job created successfully!"
+  else
+    echo "❌ Failed to create import job. HTTP $http_code"
+    echo "$body" | jq
+  fi
+}
+
+# ----------------- Menus --------------------
+
+user_management(){
   while true; do
     echo
-    echo "====== JumpCloud CLI Menu ======"
+    echo "====== User Management ======"
     echo "1. Add user to group"
     echo "2. Remove user from group"
     echo "3. List all users"
     echo "4. List all groups"
-    echo "5. Set / Update API key"
-    echo "6. Exit"
-    echo "====== System Management ======"
-    echo "7. View system info"
-    echo "8. List all systems"
-    echo "9. View users on system"
-    echo "10. View system’s group memberships"
-    echo "11. Add system to system group"
-    echo "12. Delete a system"
-    echo "================================"
-    read -rp "Choose an option [1-12]: " choice
-
-    case "$choice" in
+    echo "5. Return to main menu"
+    echo "============================="
+    read -rp "Choose an option [1-5]: " choice
+    case "$choice" in 
       1) add_user_to_group ;;
       2) remove_user_from_group ;;
       3) list_all_users ;;
       4) list_all_groups ;;
-      5) set_api_key ;;
-      6) echo "👋 Goodbye!"; exit 0 ;;
-      7) view_system_info ;;
-      8) list_all_systems ;;
-      9) view_users_on_system ;;
-      10) view_system_groups ;;
-      11) add_system_to_group ;;
-      12) delete_system ;;
+      5) return;;
+      *) echo "⚠️ Invalid option. Try again." ;;
+    esac
+  done
+}
+
+
+systems_management(){
+  while true; do
+    echo
+    echo "====== System Management ======"
+    echo "1. View system info"
+    echo "2. List all systems"
+    echo "3. View users on system"
+    echo "4. View system’s group memberships"
+    echo "5. Add system to system group"
+    echo "6. Delete a system"
+    echo "7. Return to main menu"
+    echo "================================"
+    read -rp "Choose an option [1-7]: " choice
+    case "$choice" in 
+      1) view_system_info;;
+      2) list_all_systems;;
+      3) view_users_on_system;;
+      4) view_system_groups;;
+      5) add_system_to_group;;
+      6) delete_system;;
+      7) return;;
+      *) echo "⚠️ Invalid option. Try again." ;;
+    esac
+  done
+}
+
+app_management(){
+  while true; do
+    echo
+    echo "====== App Management ======="
+    echo "1. List all applications"
+    echo "2. Get application details"
+    echo "3. Link app to user group"
+    echo "4. Unlink app from user group"
+    echo "5. Create Import User Job for Application."
+    echo "6. Return to main menu"
+    echo "============================="
+    read -rp "Choose an option [1-5]: " choice
+    case "$choice" in 
+      1) list_apps ;;
+      2) get_app_details ;;
+      3) link_app_to_group ;;
+      4) unlink_app_from_group ;;
+      5) create_import_job;;
+      6) return;;
+      *) echo "⚠️ Invalid option. Try again." ;;
+    esac
+  done
+}
+
+# ----------------- 📋 Main Menu -----------------
+main_menu() {
+  while true; do
+    echo
+    echo "====== JumpCloud CLI Menu ======"
+    echo "1. Set/ Update API key"
+    echo "2 User Management"
+    echo "3. Systems Management"
+    echo "4. App Management"
+    echo "5. Exit"
+    echo "================================"
+    read -rp "Choose an option [1-12]: " choice
+
+    case "$choice" in
+      1) set_api_key;;
+      2) user_management;;
+      3) systems_management;;
+      4) app_management;;
+      5) echo "👋 Goodbye!"; exit 0 ;;
       *) echo "⚠️ Invalid option. Try again." ;;
     esac
   done
