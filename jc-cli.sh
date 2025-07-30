@@ -188,10 +188,7 @@ add_system_to_group() {
   fi
 
   read -rp "👥 Enter system group name: " GROUP_NAME
-
-  GROUP_ID=$(curl -s -X GET "https://console.jumpcloud.com/api/v2/systemgroups?filter=name:eq:$GROUP_NAME" \
-    -H "x-api-key: $JC_API_KEY" | jq -r '.[0].id')
-
+  GROUP_ID=$(get_group_id "$GROUP_NAME")
   if [[ -z "$GROUP_ID" || "$GROUP_ID" == "null" ]]; then
     echo "❌ Group not found."
     return
@@ -263,23 +260,37 @@ get_app_details() {
 
 link_app_to_group() {
   read -p "🆔 Enter Application ID: " app_id
-  read -p "👥 Enter Group ID to associate: " group_id
+  
+  read -rp "👥 Enter system group name: " GROUP_NAME
+
+  GROUP_ID=$(get_group_id "$GROUP_NAME")
+  if [[ -z "$GROUP_ID" || "$GROUP_ID" == "null" ]]; then
+    echo "❌ Group not found."
+    return
+  fi
   echo "🔗 Linking application to group..."
   curl -s -X POST \
     -H "x-api-key: $JC_API_KEY" \
     -H "Content-Type: application/json" \
-    -d '{"op": "add", "type": "user_group", "id": "'$group_id'"}' \
+    -d '{"op": "add", "type": "user_group", "id": "'$GROUP_ID'"}' \
     https://console.jumpcloud.com/api/v2/applications/$app_id/associations | jq
 }
 
 unlink_app_from_group() {
   read -p "🆔 Enter Application ID: " app_id
-  read -p "👥 Enter Group ID to remove: " group_id
+  
+  read -rp "👥 Enter system group name: " GROUP_NAME
+
+  GROUP_ID=$(get_group_id "$GROUP_NAME")
+  if [[ -z "$GROUP_ID" || "$GROUP_ID" == "null" ]]; then
+    echo "❌ Group not found."
+    return
+  fi
   echo "❌ Unlinking application from group..."
   curl -s -X POST \
     -H "x-api-key: $JC_API_KEY" \
     -H "Content-Type: application/json" \
-    -d '{"op": "remove", "type": "user_group", "id": "'$group_id'"}' \
+    -d '{"op": "remove", "type": "user_group", "id": "'$GROUP_ID'"}' \
     https://console.jumpcloud.com/api/v2/applications/$app_id/associations | jq
 }
 create_import_job() {
@@ -330,6 +341,37 @@ create_import_job() {
     echo "❌ Failed to create import job. HTTP $http_code"
     echo "$body" | jq
   fi
+}
+
+uploadAppLogo() {
+       read -p "Enter Application ID: " app_id
+       read -p "Enter full path to the logo image file: " image_path
+
+       response=$(curl -s -o /dev/null -w "%{http_code}" -X POST "https://console.jumpcloud.com/api/v2/applications/$app_id/logo" \
+          -H "x-api-key: $API_KEY" \
+          -F "image=@$image_path")
+
+       if [ "$response" == "204" ]; then
+          echo "✅ Logo uploaded successfully."
+       else
+          echo "❌ Failed to upload logo. HTTP Status: $response"
+       fi
+}
+
+listAppUserGroups()  {
+	read -p "Enter Application ID: " app_id
+
+        curl -s -X GET "https://console.jumpcloud.com/api/v2/applications/$app_id/usergroups" \
+          -H "accept: application/json" \
+          -H "x-api-key: $JC_API_KEY" | jq
+}
+
+listAppUsers() {
+	 read -p "Enter Application ID: " app_id
+
+         curl -s -X GET "https://console.jumpcloud.com/api/v2/applications/$app_id/users" \
+           -H "accept: application/json" \
+           -H "x-api-key: $JC_API_KEY" | jq
 }
 
 # ----------------- Menus --------------------
@@ -392,16 +434,22 @@ app_management(){
     echo "3. Link app to user group"
     echo "4. Unlink app from user group"
     echo "5. Create Import User Job for Application."
-    echo "6. Return to main menu"
+    echo "6. Set or Update Application Logo"
+    echo "7. List all user groups bound to Application"
+    echo "8. List all users bound to Application"
+    echo "9. Return to main menu"
     echo "============================="
-    read -rp "Choose an option [1-5]: " choice
+    read -rp "Choose an option [1-9]: " choice
     case "$choice" in 
       1) list_apps ;;
       2) get_app_details ;;
       3) link_app_to_group ;;
       4) unlink_app_from_group ;;
       5) create_import_job;;
-      6) return;;
+      6) uploadAppLogo;;
+      7) listAppUserGroups;;
+      8) listAppUsers;; 
+      9) return;;
       *) echo "⚠️ Invalid option. Try again." ;;
     esac
   done
@@ -413,12 +461,12 @@ main_menu() {
     echo
     echo "====== JumpCloud CLI Menu ======"
     echo "1. Set/ Update API key"
-    echo "2 User Management"
+    echo "2  User Management"
     echo "3. Systems Management"
     echo "4. App Management"
     echo "5. Exit"
     echo "================================"
-    read -rp "Choose an option [1-12]: " choice
+    read -rp "Choose an option [1-5]: " choice
 
     case "$choice" in
       1) set_api_key;;
