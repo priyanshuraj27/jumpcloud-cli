@@ -4,22 +4,32 @@ A simple, interactive, menu-driven CLI tool built with `bash` for managing users
 
 ---
 
-## 🚀 Features
-
-- Add user to group  
-- Remove user from group  
-- List all users  
-- List all groups  
+## Features
 - Set / update API key  
-- Manage system metadata:
+- User Management
+  - Add user to group  
+  - Remove user from group  
+  - List all users  
+  - List all groups
+      
+- System Management:
+  - View System info
   - List all systems
-  - View metadata of a specific system
-  - Add metadata to a system
-  - Remove metadata from a system
+  - View users on system
+  - View system’s group memberships
+  - Add system to system group
+  - Delete a system
+    
 - Application management:
   - List all applications
   - View application details
-- Create import jobs (for IdM-integrated apps)
+  - Link app to user group
+  - Unlink app from user group
+  - Create Import User Job for Application.
+  - Set or Update Application Logo
+  - List all user groups bound to Application
+  - List all users bound to Application
+  - Create import jobs (for IdM-integrated apps)
 
 ---
 
@@ -44,3 +54,7 @@ After Setup run
 ```bash
 jc-cli
 ```
+
+## Questions or Need Help?
+- Discord: [bhuvangoel_04](https://discord.com/invite/bhuvangoel_04)
+- Report bugs or request features through [GitHub Issues](https://github.com/bhuvangoel04/jumpcloud-cli/issues)
